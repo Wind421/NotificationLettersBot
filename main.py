@@ -45,7 +45,7 @@ async def menu_def(message: Message):
 
 @dp.message(Command('work'))
 async def send_menu(message: Message):
-    await bot.send_message(message.chat.id, 'Я работаю')
+    await bot.send_message(message.chat.id, 'Привет, Я работаю')
 
 if __name__ == '__main__':
     dp.run_polling(bot)
