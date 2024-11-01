@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pandas as pd
 import os
-#pd.set_option('display.max_columns', None)
 
 def read_dk_tasks(what):
     export_files = []

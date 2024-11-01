@@ -1,17 +1,28 @@
 import excel_scripts as es
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message,InlineKeyboardButton,InlineKeyboardMarkup,CallbackQuery
+from aiogram.types import Message,InlineKeyboardButton,InlineKeyboardMarkup,CallbackQuery,Document
 from aiogram.filters import Command
 from aiogram.enums import ParseMode
+from aiogram.enums.content_type import ContentType
+from aiogram.fsm.state import State, StatesGroup
+from aiogram import F
+
+import google_requests as gr
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from .callback_defs import *
+from config import *
+import os
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+class Form(StatesGroup):
+    enter_letter = State()
+    outer_letter = State()
+    request_letter = State()
 
 @dp.message(Command("start"))
 async def start_def(message: Message):
@@ -46,6 +57,101 @@ async def menu_def(message: Message):
 @dp.message(Command('work'))
 async def send_menu(message: Message):
     await bot.send_message(message.chat.id, 'Привет, Я работаю')
+
+@dp.callback_query(lambda call: call.data in ['enter_letter','yes_other'])
+async def callback_menu(callback_query: CallbackQuery, state: Form):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.message.chat.id,
+                           'Перешлите или отправьте исходящее письмо.\nНе забудьте указать ВР и краткое содержание письма,\n а также Вр-ответа если он присутствует')
+    await state.set_state(Form.enter_letter)
+
+#region Menu functions
+@dp.callback_query(lambda call: call.data in ['outer_letter','yes_enter'])
+async def callback_menu(callback_query: CallbackQuery, state: Form):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.message.chat.id,
+                           'Перешлите или отправьте исходящее письмо.\nНе забудьте указать ВР и суть запроса')
+    await state.set_state(Form.outer_letter)
+
+@dp.callback_query(lambda call: call.data in ['request_letter','yes_request'])
+async def callback_menu(callback_query: CallbackQuery, state: Form):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.message.chat.id,
+                           'Перешлите или отправьте направленный запрос.\nНе забудьте указать RP и суть запроса')
+    await state.set_state(Form.request_letter)
+#endregion Menu functions
+
+@dp.message(Form.enter_letter)
+async def process_letter(message: Message, state: Form):
+    data = await state.get_data()
+    files = data.get("files", [])
+    #print(*message,sep='\n')
+
+    #if message.content_type == ContentType.CAPTION:
+    if message.caption is not None:
+        print(gr.wrap_enter_letter(message.caption))
+    elif message.text is not None:
+        print(gr.wrap_enter_letter(message.text))
+    await message.answer("Файлы обработаны и сохранены.")
+
+    if message.content_type == ContentType.DOCUMENT:
+        file_id = message.document.file_id
+        file = await bot.get_file(file_id)
+        file_path = os.path.join(r"C:\Users\Дарья\PycharmProjects\TgBotNotifications\downloaded_files\\",
+                                 message.document.file_name)
+
+        await bot.download_file(file.file_path, file_path)
+        files.append(file_path)
+
+        await state.update_data(files=files)
+        await state.clear()
+
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='Да', callback_data="yes_other"),
+         InlineKeyboardButton(text='Нет', callback_data="no")],
+    ])
+    await bot.send_message(chat_id=message.chat.id,
+                           text="Отправить ещё письмо?",
+                           parse_mode=ParseMode.MARKDOWN,
+                           reply_markup=markup)
+
+
+#region Forms
+@dp.message(Form.outer_letter)
+async def process_letter(message: Message, state: Form):
+    await state.update_data(enter_letter=message.text)
+    await bot.send_message(message.chat.id, 'Письмо успешно загружено в таблицу!')
+    await state.clear()
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='Да', callback_data="yes_enter"),
+         InlineKeyboardButton(text='Нет', callback_data="no")],
+    ])
+    await bot.send_message(chat_id=message.chat.id,
+                           text="Отправить ещё письмо?",
+                           parse_mode=ParseMode.MARKDOWN,
+                           reply_markup=markup)
+
+@dp.message(Form.request_letter)
+async def process_letter(message: Message, state: Form):
+    await state.update_data(request_letter=message.text)
+    await bot.send_message(message.chat.id, 'Запрос успешно добавлен в таблицу!')
+    await state.clear()
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='Да', callback_data="yes_request"),
+         InlineKeyboardButton(text='Нет', callback_data="no")],
+    ])
+    await bot.send_message(chat_id=message.chat.id,
+                           text="Отправить ещё запрос?",
+                           parse_mode=ParseMode.MARKDOWN,
+                           reply_markup=markup)
+#endregion
+
+@dp.callback_query(lambda call: call.data == 'no')
+async def process_no(callback_query: CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.message.chat.id,
+                           'Нажмите /menu')
+
 
 if __name__ == '__main__':
     dp.run_polling(bot)
