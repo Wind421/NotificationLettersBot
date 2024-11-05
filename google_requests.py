@@ -1,7 +1,7 @@
 import re
 
 vr_pattern = r'(?i)вр-(\d{8})'
-srok_pattern =  r'(?i)срок\s*(-\s*до\s+|до\s+|:\s+)?(\d{2}\.\d{2}\.\d{4})\s*(до)?\s*(\d{1,2}:\d{2})?'
+srok_pattern =  r'(?i)срок\s*(-\s*до\s+|до\s+|:\s+)?(сегодня\s*|(\d{2}\.\d{2}\.\d{4}))\s*(до)?\s*(\d{1,2}:\d{2})?'
 
 def wrap_enter_letter(text):
     text = text.strip()

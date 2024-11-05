@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.enums import ParseMode
 from aiogram.enums.content_type import ContentType
 from aiogram.fsm.state import State, StatesGroup
-from aiogram import F
+import asyncio
 
 import google_requests as gr
 
@@ -18,11 +18,15 @@ import os
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+BOTMESS_ID = None
+COUNTMESS_USER = None
 
 class Form(StatesGroup):
     enter_letter = State()
     outer_letter = State()
     request_letter = State()
+    files = State()
+    letter = State()
 
 @dp.message(Command("start"))
 async def start_def(message: Message):
@@ -61,8 +65,10 @@ async def send_menu(message: Message):
 @dp.callback_query(lambda call: call.data in ['enter_letter','yes_other'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
     await bot.answer_callback_query(callback_query.id)
-    await bot.send_message(callback_query.message.chat.id,
+    last_message = await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте исходящее письмо.\nНе забудьте указать ВР и краткое содержание письма,\n а также Вр-ответа если он присутствует')
+    global BOTMESS_ID
+    BOTMESS_ID = last_message.message_id
     await state.set_state(Form.enter_letter)
 
 #region Menu functions
@@ -83,17 +89,16 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
 
 @dp.message(Form.enter_letter)
 async def process_letter(message: Message, state: Form):
-    data = await state.get_data()
-    files = data.get("files", [])
-    #print(*message,sep='\n')
 
-    #if message.content_type == ContentType.CAPTION:
+    global COUNTMESS_USER
     if message.caption is not None:
-        print(gr.wrap_enter_letter(message.caption))
-        await message.answer("Письмо сохранено.")
+        await state.update_data(letter=gr.wrap_enter_letter(message.caption))
+        last_message = await message.answer("Письмо сохранено!")
+        COUNTMESS_USER = last_message.message_id-BOTMESS_ID-1
     elif message.text is not None:
-        print(gr.wrap_enter_letter(message.text))
-        await message.answer("Письмо сохранено.")
+        await state.update_data(letter=gr.wrap_enter_letter(message.text))
+        last_message = await message.answer("Письмо сохранено!")
+        COUNTMESS_USER = last_message.message_id-BOTMESS_ID-2
 
     if message.content_type == ContentType.DOCUMENT:
         file_id = message.document.file_id
@@ -102,20 +107,26 @@ async def process_letter(message: Message, state: Form):
                                  message.document.file_name)
 
         await bot.download_file(file.file_path, file_path)
-        files.append(file_path)
 
-        await state.update_data(files=files)
-        await message.answer("Файл добавлен")
+        data = await state.get_data()
+        if not data.get('files'):
+            await state.update_data(files = [file_path])
+        else:
+            await state.update_data(files = list(data['files'])+[file_path])
+        COUNTMESS_USER -=1
+
+    if COUNTMESS_USER==0:
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text='Да', callback_data="yes_other"),
+             InlineKeyboardButton(text='Нет', callback_data="no")],
+        ])
+        await bot.send_message(chat_id=message.chat.id,
+                               text="Отправить ещё письмо?",
+                               parse_mode=ParseMode.MARKDOWN,
+                               reply_markup=markup)
+        data = await state.get_data()
         await state.clear()
-
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Да', callback_data="yes_other"),
-         InlineKeyboardButton(text='Нет', callback_data="no")],
-    ])
-    await bot.send_message(chat_id=message.chat.id,
-                           text="Отправить ещё письмо?",
-                           parse_mode=ParseMode.MARKDOWN,
-                           reply_markup=markup)
+        print(data)
 
 
 #region Forms
