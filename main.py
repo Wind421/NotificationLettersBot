@@ -90,9 +90,10 @@ async def process_letter(message: Message, state: Form):
     #if message.content_type == ContentType.CAPTION:
     if message.caption is not None:
         print(gr.wrap_enter_letter(message.caption))
+        await message.answer("Письмо сохранено.")
     elif message.text is not None:
         print(gr.wrap_enter_letter(message.text))
-    await message.answer("Файлы обработаны и сохранены.")
+        await message.answer("Письмо сохранено.")
 
     if message.content_type == ContentType.DOCUMENT:
         file_id = message.document.file_id
@@ -104,6 +105,7 @@ async def process_letter(message: Message, state: Form):
         files.append(file_path)
 
         await state.update_data(files=files)
+        await message.answer("Файл добавлен")
         await state.clear()
 
     markup = InlineKeyboardMarkup(inline_keyboard=[
