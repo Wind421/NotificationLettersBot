@@ -9,6 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 import asyncio
 
 import google_requests as gr
+import google_scripts as gs
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -62,21 +63,22 @@ async def menu_def(message: Message):
 async def send_menu(message: Message):
     await bot.send_message(message.chat.id, 'Привет, Я работаю')
 
-@dp.callback_query(lambda call: call.data in ['enter_letter','yes_other'])
-async def callback_menu(callback_query: CallbackQuery, state: Form):
-    await bot.answer_callback_query(callback_query.id)
-    last_message = await bot.send_message(callback_query.message.chat.id,
-                           'Перешлите или отправьте исходящее письмо.\nНе забудьте указать ВР и краткое содержание письма,\n а также Вр-ответа если он присутствует')
-    global BOTMESS_ID
-    BOTMESS_ID = last_message.message_id
-    await state.set_state(Form.enter_letter)
-
 #region Menu functions
-@dp.callback_query(lambda call: call.data in ['outer_letter','yes_enter'])
+@dp.callback_query(lambda call: call.data in ['enter_letter','yes_enter'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
-                           'Перешлите или отправьте исходящее письмо.\nНе забудьте указать ВР и суть запроса')
+                           'Перешлите или отправьте входящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма')
+    await state.set_state(Form.enter_letter)
+
+
+@dp.callback_query(lambda call: call.data in ['outer_letter','yes_outer'])
+async def callback_menu(callback_query: CallbackQuery, state: Form):
+    await bot.answer_callback_query(callback_query.id)
+    last_message = await bot.send_message(callback_query.message.chat.id,
+                           'Перешлите или отправьте исходящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма и Вр-ответа, если есть')
+    global BOTMESS_ID
+    BOTMESS_ID = last_message.message_id
     await state.set_state(Form.outer_letter)
 
 @dp.callback_query(lambda call: call.data in ['request_letter','yes_request'])
@@ -92,57 +94,76 @@ async def process_letter(message: Message, state: Form):
 
     global COUNTMESS_USER
     if message.caption is not None:
-        await state.update_data(letter=gr.wrap_enter_letter(message.caption))
-        last_message = await message.answer("Письмо сохранено!")
-        COUNTMESS_USER = last_message.message_id-BOTMESS_ID-1
+        await state.update_data(letter=gr.wrap_enterletter(message.caption))
+        await message.answer("Идет загрузка ⏳")
+        COUNTMESS_USER = 0
+
     elif message.text is not None:
-        await state.update_data(letter=gr.wrap_enter_letter(message.text))
-        last_message = await message.answer("Письмо сохранено!")
-        COUNTMESS_USER = last_message.message_id-BOTMESS_ID-2
+        await state.update_data(letter=gr.wrap_enterletter(message.text))
+        await message.answer("Идет загрузка ⏳")
+        COUNTMESS_USER = 0
 
-    if message.content_type == ContentType.DOCUMENT:
-        file_id = message.document.file_id
-        file = await bot.get_file(file_id)
-        file_path = os.path.join(r"C:\Users\Дарья\PycharmProjects\TgBotNotifications\downloaded_files\\",
-                                 message.document.file_name)
-
-        await bot.download_file(file.file_path, file_path)
-
+    if COUNTMESS_USER == 0:
         data = await state.get_data()
-        if not data.get('files'):
-            await state.update_data(files = [file_path])
+        if not data['letter']:
+            await message.answer("Неправильный формат письма.")
         else:
-            await state.update_data(files = list(data['files'])+[file_path])
-        COUNTMESS_USER -=1
+            result = gs.post_enterletter(data['letter'])
+            if not result:
+                await message.answer("Это письмо уже есть в таблице.")
+            else:
+                await message.answer("Письмо сохранено!")
 
-    if COUNTMESS_USER==0:
+        await state.clear()
+        COUNTMESS_USER=1
         markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text='Да', callback_data="yes_other"),
+            [InlineKeyboardButton(text='Да', callback_data="yes_enter"),
              InlineKeyboardButton(text='Нет', callback_data="no")],
         ])
         await bot.send_message(chat_id=message.chat.id,
-                               text="Отправить ещё письмо?",
+                               text="Отправить одно исходящее письмо?",
                                parse_mode=ParseMode.MARKDOWN,
                                reply_markup=markup)
-        data = await state.get_data()
-        await state.clear()
-        print(data)
 
-
-#region Forms
 @dp.message(Form.outer_letter)
 async def process_letter(message: Message, state: Form):
-    await state.update_data(enter_letter=message.text)
-    await bot.send_message(message.chat.id, 'Письмо успешно загружено в таблицу!')
-    await state.clear()
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Да', callback_data="yes_enter"),
-         InlineKeyboardButton(text='Нет', callback_data="no")],
-    ])
-    await bot.send_message(chat_id=message.chat.id,
-                           text="Отправить ещё письмо?",
-                           parse_mode=ParseMode.MARKDOWN,
-                           reply_markup=markup)
+
+    if message.caption is not None:
+        data = await state.get_data()
+        if data:
+            await state.update_data(letter=gr.wrap_outerletter(message.caption,data['letter']))
+        else:
+            await state.update_data(letter=gr.wrap_outerletter(message.caption))
+    elif message.text is not None:
+        data = await state.get_data()
+        if data:
+            await state.update_data(letter=gr.wrap_outerletter(message.text,data['letter']))
+        else:
+            await state.update_data(letter=gr.wrap_outerletter(message.text))
+
+
+    data = await state.get_data()
+    if data['letter'][1][0]:
+        await message.answer("Идет загрузка ⏳")
+        if not data['letter']:
+            await message.answer("Неправильный формат письма.")
+        else:
+            #result = gs.post_outerletter(data['letter'])
+            result=True
+            if not result:
+                await message.answer("Это письмо уже есть в таблице.")
+            else:
+                await message.answer("Письмо сохранено!")
+
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text='Да', callback_data="yes_outer"),
+                InlineKeyboardButton(text='Нет', callback_data="no")],
+        ])
+        await bot.send_message(chat_id=message.chat.id,
+                               text="Отправить ещё одно исходящее письмо?",
+                               parse_mode=ParseMode.MARKDOWN,
+                               reply_markup=markup)
+        await state.clear()
 
 @dp.message(Form.request_letter)
 async def process_letter(message: Message, state: Form):
