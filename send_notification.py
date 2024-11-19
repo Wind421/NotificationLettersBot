@@ -2,6 +2,7 @@ from datetime import time
 import asyncio
 import schedule
 from aiogram import Bot
+from aiogram.exceptions import TelegramForbiddenError
 from config import TOKEN
 import pandas as pd
 import form_notification as fn
@@ -15,10 +16,14 @@ async def send_message():
     df = pd.read_excel(r'C:\Users\Дарья\PycharmProjects\TgBotNotifications\users.xlsx')
 
     for value in df.iloc[:, 0]:
-        await bot.send_message(value,file_content)
+        try:
+            await bot.send_message(value,file_content)
+        except TelegramForbiddenError:
+            pass
+
 
 def schedule_message():
-    schedule.every().day.at("10:00").do(lambda: asyncio.create_task(send_message()))
+    schedule.every().day.at("16:20").do(lambda: asyncio.create_task(send_message()))
 
 async def main():
     fn.write_current_date()

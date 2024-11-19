@@ -3,7 +3,8 @@ import re
 
 vr_pattern = r'(?i)вр\s*-\s*(\d{8})'
 ansvr_pattern = r'(?i)ответ на вр-\s*(\d{8})'
-srok_pattern =  r'(?i)срок\s*(-\s*до\s+|до\s+|:\s+)?(сегодня\s*|(\d{2}\.\d{2}\.\d{4}))\s*(до)?\s*(\d{1,2}:\d{2})?'
+request_pattern = r'(?i)RP(\d{5})'
+srok_pattern =  r'(?i)срок\s*(-\s*до\s+|до\s+|:\s+)?(сегодня\s*|(\d{2}\.\d{2}\.(\d{4}|\d{2})))\s*(до)?\s*(\d{1,2}:\d{2})?'
 
 def wrap_enterletter(text):
     try:
@@ -40,7 +41,6 @@ def process_text(text):
     lines = [line for line in lines if not any(sub in line for sub in ['Вр-', 'вр-', 'вр -', 'Вр -'])]
     lines = [line for line in lines if not line.startswith('@')]
     return '\n'.join(lines)
-
 def wrap_outerletter(text,data=None):
     text = re.sub(r'n+', 'n', text)
     text = text.strip()
@@ -50,8 +50,23 @@ def wrap_outerletter(text,data=None):
         ansvr = re.search(ansvr_pattern,text)
         if ansvr:
             vrs = [v for v in vrs if v != ansvr.group()[-8:]]
-        return f_text, [vrs[0] if vrs else False, ansvr.group()[-8:] if ansvr else False]
+        return f_text, [[vrs[0]] if vrs else False, ansvr.group()[-8:] if ansvr else False]
     else:
         if not data[1][0]:
             data[1][0] = re.findall(vr_pattern, text)
             return data[0]+' '+f_text, data[1]
+
+def wrap_request(text):
+    try:
+        text = text.strip()
+        request_match = re.search(request_pattern, text)
+        srok_match = re.search(srok_pattern, text)
+
+        request_value = request_match.group()
+        if request_value:
+            text = text.replace(request_match.group(), '')
+
+        srok_value = srok_match.group(2) if srok_match else None
+        return text, request_value, srok_value
+    except Exception:
+        return False

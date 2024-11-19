@@ -42,12 +42,28 @@ def post_outerletter(letter):
 
     vr = letter[1][0]
     vr_column = worksheet.col_values(2)
-    if not any(vr == item or (item.lower().startswith("вр-") and item[3:] == vr) for item in vr_column):
+    if not any(vr[0] == item or (item.lower().startswith("вр-") and item[3:] == vr) for item in vr_column):
         ansvr = letter[1][1]
         if ansvr:
-            row_data=('',letter[1][0],'',letter[0],'на согласовании', '', f'Ответ на Вр-{ansvr}')
+            row_data = ('', str(*vr),'',str(letter[0]),'на согласовании', '', f'Ответ на Вр-{ansvr}')
         else:
-            row_data = ('',letter[1][0], '', letter[0], 'на согласовании', '', '')
+            row_data = ('', str(*vr), '', str(letter[0]), 'на согласовании', '', '')
+        worksheet.append_row(row_data)
+        worksheet.format("D", {"wrapStrategy": "WRAP"})
+        return True
+    else:
+        return False
+
+def post_request(letter):
+    gc = gspread.service_account(filename=CREDENTIALS_FILENAME)
+    sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
+    worksheet = sh.worksheet('СВПО')
+
+    rp = letter[1]
+    rp_column = worksheet.col_values(2)
+    if not any(rp == item for item in rp_column):
+        num_column = worksheet.col_values(1)
+        row_data = (int(num_column[-1])+1,letter[1], str(datetime.now().strftime("%d.%m.%Y")), letter[0], '', letter[2])
         worksheet.append_row(row_data)
         worksheet.format("D", {"wrapStrategy": "WRAP"})
         return True

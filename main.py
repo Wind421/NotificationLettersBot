@@ -71,14 +71,11 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
                            'Перешлите или отправьте входящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма')
     await state.set_state(Form.enter_letter)
 
-
 @dp.callback_query(lambda call: call.data in ['outer_letter','yes_outer'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
     await bot.answer_callback_query(callback_query.id)
-    last_message = await bot.send_message(callback_query.message.chat.id,
+    await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте исходящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма и Вр-ответа, если есть')
-    global BOTMESS_ID
-    BOTMESS_ID = last_message.message_id
     await state.set_state(Form.outer_letter)
 
 @dp.callback_query(lambda call: call.data in ['request_letter','yes_request'])
@@ -89,6 +86,7 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
     await state.set_state(Form.request_letter)
 #endregion Menu functions
 
+#region Send_letters
 @dp.message(Form.enter_letter)
 async def process_letter(message: Message, state: Form):
 
@@ -121,7 +119,7 @@ async def process_letter(message: Message, state: Form):
              InlineKeyboardButton(text='Нет', callback_data="no")],
         ])
         await bot.send_message(chat_id=message.chat.id,
-                               text="Отправить одно исходящее письмо?",
+                               text="Отправить одно входящее письмо?",
                                parse_mode=ParseMode.MARKDOWN,
                                reply_markup=markup)
 
@@ -148,8 +146,7 @@ async def process_letter(message: Message, state: Form):
         if not data['letter']:
             await message.answer("Неправильный формат письма.")
         else:
-            #result = gs.post_outerletter(data['letter'])
-            result=True
+            result = gs.post_outerletter(data['letter'])
             if not result:
                 await message.answer("Это письмо уже есть в таблице.")
             else:
@@ -167,17 +164,37 @@ async def process_letter(message: Message, state: Form):
 
 @dp.message(Form.request_letter)
 async def process_letter(message: Message, state: Form):
-    await state.update_data(request_letter=message.text)
-    await bot.send_message(message.chat.id, 'Запрос успешно добавлен в таблицу!')
-    await state.clear()
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Да', callback_data="yes_request"),
-         InlineKeyboardButton(text='Нет', callback_data="no")],
-    ])
-    await bot.send_message(chat_id=message.chat.id,
-                           text="Отправить ещё запрос?",
-                           parse_mode=ParseMode.MARKDOWN,
-                           reply_markup=markup)
+    global COUNTMESS_USER
+    if message.caption is not None:
+        await state.update_data(letter=gr.wrap_request(message.caption))
+        await message.answer("Идет загрузка ⏳")
+        COUNTMESS_USER = 0
+    elif message.text is not None:
+        await state.update_data(letter=gr.wrap_request(message.text))
+        await message.answer("Идет загрузка ⏳")
+        COUNTMESS_USER = 0
+
+    if COUNTMESS_USER == 0:
+        data = await state.get_data()
+        if not data['letter']:
+            await message.answer("Неправильный формат запроса.")
+        else:
+            result = gs.post_request(data['letter'])
+            if not result:
+                await message.answer("Этот запрос уже есть в таблице.")
+            else:
+                await message.answer("Письмо сохранено!")
+
+        await state.clear()
+        COUNTMESS_USER = 1
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text='Да', callback_data="yes_request"),
+             InlineKeyboardButton(text='Нет', callback_data="no")],
+        ])
+        await bot.send_message(chat_id=message.chat.id,
+                               text="Отправить ещё запрос?",
+                               parse_mode=ParseMode.MARKDOWN,
+                               reply_markup=markup)
 #endregion
 
 @dp.callback_query(lambda call: call.data == 'no')
