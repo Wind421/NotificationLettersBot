@@ -9,6 +9,13 @@ ansvr_pattern = r'(?i)ответ на вр-\s*(\d{8})'
 request_pattern = r'(?i)RP(\d{5})'
 srok_pattern =  r'(?i)срок\s*(-\s*до\s+|до\s+|:\s+)?(сегодня\s*|(\d{2}\.\d{2}\.(\d{4}|\d{2})))\s*(до)?\s*(\d{1,2}:\d{2})?'
 
+def wrap_change(text):
+    vr = re.search(vr_pattern, text)
+    if vr:
+        return vr.group(1)
+    else:
+        raise ValueError('Неправильный формат Вр.')
+
 def wrap_enterletter(text):
     """
     Метод разбивает текст письма на составляющие:
@@ -27,9 +34,18 @@ def wrap_enterletter(text):
 
         srok_value = srok_match.group(2) if srok_match else None
 
+        if any([True for word in ['кампус', 'гагарина', 'гостин', 'корпус', 'дальняя', 'мирового', 'РИП'] if word in text.lower()]):
+            project = 'кампус'
+        elif any([True for word in ['терасс', 'парк', 'почаин'] if word in text.lower()]):
+            project = 'почаина'
+        elif any([True for word in ['черниг', 'берегоукр', 'набереж'] if word in text.lower()]):
+            project = 'чернига'
+        else:
+            project = ''
+
         text = re.sub(r'n+', 'n', text) #убирает лишние переносы строк
         text = text.strip()
-        return text, vr_value, srok_value
+        return text, vr_value, srok_value, project
     except Exception:
         return False
 
@@ -66,16 +82,27 @@ def wrap_outerletter(text,data=None):
     text = re.sub(r'n+', 'n', text)
     text = text.strip()
     f_text = process_text(text)
+
+    if any([True for word in ['кампус', 'гагарина', 'гостин', 'корпус', 'дальняя', 'мирового', 'РИП'] if
+            word in text.lower()]):
+        project = 'кампус'
+    elif any([True for word in ['терасс', 'парк', 'почаин'] if word in text.lower()]):
+        project = 'почаина'
+    elif any([True for word in ['черниг', 'берегоукр', 'набереж'] if word in text.lower()]):
+        project = 'чернига'
+    else:
+        project = ''
+
     if not data: #первое письмо без данных
         vrs = re.findall(vr_pattern,text)
         ansvr = re.search(ansvr_pattern,text)
         if ansvr:
             vrs = [v for v in vrs if v != ansvr.group()[-8:]] #собирает все вр не совпадающие с ответом на вр
-        return f_text, [[vrs[0]] if vrs else False, ansvr.group()[-8:] if ansvr else False] #возвращает False или вр-ы
+        return f_text, [[vrs[0]] if vrs else '', ansvr.group()[-8:] if ansvr else ''],project #возвращает False или вр-ы
     else: #Второе письмо с данными
         if not data[1][0]: #Если нет Вр
             data[1][0] = re.findall(vr_pattern, text)
-            return data[0]+' '+f_text, data[1]
+            return data[0]+' '+f_text, data[1], data[2]
 
 def wrap_request(text):
     """

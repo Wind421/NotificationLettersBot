@@ -1,4 +1,5 @@
 import logging
+from binascii import Error
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -9,6 +10,7 @@ from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, C
 import excel_scripts as es
 import google_requests as gr
 import google_scripts as gs
+from google_scripts import change
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,6 +32,13 @@ class Form(StatesGroup):
     request_letter = State()
     files = State()
     letter = State()
+
+class FormStatus(StatesGroup):
+    waiting_for_vr = State()
+    waiting_for_status = State()
+    vr = ''
+    status = ''
+    what = ''
 
 @dp.message(Command("start"))
 async def start_def(message: Message):
@@ -56,13 +65,15 @@ async def menu_def(message: Message):
     Метод команды menu - выводит клавиатуру для выбора отправки письма или запроса
     """
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Отправить\nвходящее письмо', callback_data="enter_letter")],
-        [InlineKeyboardButton(text='Отправить\nисходящее письмо', callback_data="outer_letter")],
-        [InlineKeyboardButton(text='Отправить\nRPзапрос', callback_data="request_letter")],
+        [InlineKeyboardButton(text='Отправить входящее письмо', callback_data="enter_letter")],
+        [InlineKeyboardButton(text='Отправить исходящее письмо', callback_data="outer_letter")],
+        [InlineKeyboardButton(text='Отправить RP запрос', callback_data="request_letter")],
+        [InlineKeyboardButton(text='Изменить статус', callback_data="status")],
+        [InlineKeyboardButton(text='отмена', callback_data="no")]
     ])
 
     await bot.send_message(chat_id=message.chat.id,
-                           text="*________Главное меню________*",
+                           text="-----------------Главное меню-----------------",
                            parse_mode=ParseMode.MARKDOWN,
                            reply_markup=markup)
 
@@ -168,8 +179,9 @@ async def process_letter(message: Message, state: Form):
 
 
     data = await state.get_data()
-    if data['letter'][1][0]: #При наличии Вр
+    if data['letter'][1][0]!='': #При наличии Вр, либо строка-либо False
         await message.answer("Идет загрузка ⏳")
+
         if not data['letter']:
             await message.answer("Неправильный формат письма.")
         else:
@@ -177,6 +189,7 @@ async def process_letter(message: Message, state: Form):
             if not result:
                 await message.answer("Это письмо уже есть в таблице.")
             else:
+                gs.post_ansvr(data['letter'])
                 await message.answer("Письмо сохранено!")
 
         markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -226,6 +239,71 @@ async def process_letter(message: Message, state: Form):
                                text="Отправить ещё запрос?",
                                parse_mode=ParseMode.MARKDOWN,
                                reply_markup=markup)
+#endregion
+
+#region Change
+@dp.callback_query(lambda call: call.data in ['status'])
+async def callback_menu(callback_query: CallbackQuery):
+    """
+    Метод изменения статуса - выводит сообщения с предложением для изменения статусов
+    """
+    await bot.answer_callback_query(callback_query.id)
+
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='Входящего письма', callback_data="change_enter")],
+        [InlineKeyboardButton(text='Исходящего письма', callback_data="change_outer")],
+        [InlineKeyboardButton(text='Запроса', callback_data="change_request")],
+        [InlineKeyboardButton(text='отмена', callback_data="no")]
+    ])
+
+    await bot.send_message(callback_query.message.chat.id,
+                           'Какой статус вы хотите обновить?',
+                           reply_markup=markup)
+
+@dp.callback_query(lambda call: call.data in ['change_enter',"change_outer","change_request"])
+async def callback_change(callback_query: CallbackQuery, state: FormStatus):
+    await state.update_data(what=callback_query.data.split('_')[1])
+    await bot.send_message(callback_query.message.chat.id,'Введите вр:')
+    await state.set_state(FormStatus.waiting_for_vr)
+
+@dp.message(FormStatus.waiting_for_vr)
+async def waiting_vr(message: Message, state: FormStatus):
+    if message.text is not None:
+        try:
+            vr_value = gr.wrap_change(message.text)
+            await state.update_data(vr=vr_value)
+            await bot.send_message(message.chat.id,'Введите статус:')
+            await state.set_state(FormStatus.waiting_for_status)
+        except Exception:
+            await state.clear()
+            await bot.send_message(message.chat.id, 'Неправильный формат vr. Попробуйте снова.',
+                             reply_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Изменить статус', callback_data="status")]]))
+
+@dp.message(FormStatus.waiting_for_status)
+async def waiting_status(message: Message, state: FormStatus):
+    if message.text is not None:
+        await state.update_data(status=message.text)
+        print(await state.get_data())
+        try:
+            gs.change(await state.get_data())
+            await bot.send_message(message.chat.id, 'Изменение произошло успешно!')
+
+            markup = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text='Да', callback_data="status"),
+                 InlineKeyboardButton(text='Нет', callback_data="no")],
+            ])
+            await state.clear()
+            await bot.send_message(chat_id=message.chat.id,
+                                   text="Изменить что-то ещё?",
+                                   parse_mode=ParseMode.MARKDOWN,
+                                   reply_markup=markup)
+        except:
+            await state.clear()
+            await bot.send_message(message.chat.id, 'Письма или запроса с таким номером нет. Попробуйте снова.',
+                                   reply_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Изменить статус', callback_data="status")]]))
+
+
+
 #endregion
 
 @dp.callback_query(lambda call: call.data == 'no')

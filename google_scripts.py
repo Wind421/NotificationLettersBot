@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import gspread
+from gspread_formatting import get_effective_format,format_cell_ranges,CellFormat
 from config import CREDENTIALS_FILENAME, PORUCH_SPREADSHEET_URL, MESSAGE_SPREADSHEET_URL
 import pandas as pd
 import re
@@ -38,7 +39,7 @@ def post_enterletter(letter):
     vr = letter[1]
     vr_column = worksheet.col_values(2)
     if not any(vr == item or (item.lower().startswith("вр-") and item[3:] == vr) for item in vr_column): #Если найден не такой же вр как и у письма
-        row_data = (letter[1], str(datetime.now().strftime("%d.%m.%Y")),'', letter[0], '', '', letter[2])
+        row_data = ('',letter[1], str(datetime.now().strftime("%d.%m.%Y")), letter[3], letter[0], '', 'срок не указан', letter[2])
         worksheet.append_row(row_data)
         worksheet.format("D", {"wrapStrategy": "WRAP"}) #перенос
         return True
@@ -58,9 +59,9 @@ def post_outerletter(letter):
     if not any(vr[0] == item or (item.lower().startswith("вр-") and item[3:] == vr) for item in vr_column):#Если найден не такой же вр как и у письма
         ansvr = letter[1][1]
         if ansvr: #Если есть вр ответа
-            row_data = ('', str(*vr),'',str(letter[0]),'на согласовании', '', f'Ответ на Вр-{ansvr}')
+            row_data = ('', str(*vr),str(letter[2]),str(letter[0]),'на согласовании', '', f'Ответ на Вр-{ansvr}')
         else:
-            row_data = ('', str(*vr), '', str(letter[0]), 'на согласовании', '', '')
+            row_data = ('', str(*vr), str(letter[2]), str(letter[0]), 'на согласовании', '', '')
         worksheet.append_row(row_data)
         worksheet.format("D", {"wrapStrategy": "WRAP"})
         return True
@@ -82,7 +83,53 @@ def post_request(letter):
         #           Следующий номер       RP         Дата отправки                             Текст          Срок
         row_data = (int(num_column[-1])+1,letter[1], str(datetime.now().strftime("%d.%m.%Y")), letter[0], '', letter[2])
         worksheet.append_row(row_data)
-        worksheet.format("D", {"wrapStrategy": "WRAP"})
+        formatting = get_effective_format(worksheet, f'A{len(rp_column)}:G{len(rp_column)}') #Захват и применение форматирования предыдущей строки таблицы
+        print(formatting)
+        format_cell_ranges(worksheet, [(f'A{len(rp_column)+1}:G{len(rp_column)+1}', formatting),(f'D{len(rp_column)+1}', formatting.add(CellFormat(horizontalAlignment='LEFT')))])
         return True
     else:
         return False
+
+def post_ansvr(letter):
+    if letter[1][1] != '':
+        gc = gspread.service_account(filename=CREDENTIALS_FILENAME)
+        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
+        worksheet = sh.worksheet('Вр входящее')
+        rp_column = worksheet.col_values(2)
+        if str(letter[1][1]) in rp_column:
+            row_index = rp_column.index(str(letter[1][1])) + 1
+            worksheet.update_cell(row_index, 11, str(*letter[1][0]))
+
+def change(data):
+    gc = gspread.service_account(filename=CREDENTIALS_FILENAME)
+    if data[0] == 'enter':
+        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
+        worksheet = sh.worksheet('Вр входящее')
+        rp_column = worksheet.col_values(2)
+        if str(data[1]) in rp_column:
+            row_index = rp_column.index(str(data[1])) + 1
+            worksheet.update_cell(row_index, 12, str(data[2]))
+        else:
+            raise ValueError
+
+    elif data[0] == 'outer':
+        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
+        worksheet = sh.worksheet('Вр исходящее')
+        rp_column = worksheet.col_values(2)
+        if str(data[1]) in rp_column:
+            row_index = rp_column.index(str(data[1])) + 1
+            worksheet.update_cell(row_index, 5, str(data[2]))
+        else:
+            raise ValueError
+
+    elif data[0] == 'request':
+        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
+        worksheet = sh.worksheet('СВПО')
+        rp_column = worksheet.col_values(2)
+        if str(data[1]) in rp_column:
+            row_index = rp_column.index(str(data[1])) + 1
+            worksheet.update_cell(row_index, 5, str(data[2]))
+            worksheet.update_cell(row_index, 7, str(datetime.now().strftime("%d.%m.%Y")))
+        else:
+            raise ValueError
+
