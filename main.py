@@ -1,28 +1,30 @@
-import excel_scripts as es
+import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message,InlineKeyboardButton,InlineKeyboardMarkup,CallbackQuery,Document
-from aiogram.filters import Command
 from aiogram.enums import ParseMode
-from aiogram.enums.content_type import ContentType
+from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
-import asyncio
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 
+import excel_scripts as es
 import google_requests as gr
 import google_scripts as gs
 
-import logging
 logging.basicConfig(level=logging.INFO)
 
 from config import *
-import os
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-BOTMESS_ID = None
-COUNTMESS_USER = None
+
+BOTMESS_ID = None #ID - последнего отправленного ботом сообщения
+COUNTMESS_USER = None #Количество между последним сообщением пользователя и последним письмом бота
 
 class Form(StatesGroup):
+    """
+    Класс Form - отслеживает какое именно письмо хочет отправить пользователь,
+    а также сохраняет информацию о файлах (пока нет необходимости) и содержании писем
+    """
     enter_letter = State()
     outer_letter = State()
     request_letter = State()
@@ -31,7 +33,10 @@ class Form(StatesGroup):
 
 @dp.message(Command("start"))
 async def start_def(message: Message):
-
+    """
+    Метод команды start - выводит приветственное сообщение и добавляет пользователя
+    в таблицу для дальнейшей отправки ему уведомлений
+    """
     await bot.send_message(
         message.chat.id,
         f'''Привет, {message.from_user.first_name}!\n
@@ -47,7 +52,9 @@ async def start_def(message: Message):
 
 @dp.message(Command(commands=['menu']))
 async def menu_def(message: Message):
-
+    """
+    Метод команды menu - выводит клавиатуру для выбора отправки письма или запроса
+    """
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='Отправить\nвходящее письмо', callback_data="enter_letter")],
         [InlineKeyboardButton(text='Отправить\nисходящее письмо', callback_data="outer_letter")],
@@ -66,6 +73,10 @@ async def send_menu(message: Message):
 #region Menu functions
 @dp.callback_query(lambda call: call.data in ['enter_letter','yes_enter'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
+    """
+    Метод обработки входящих сообщений - выводит сообщения с предложением для отправки письма
+    и устанавливает состояние "отправить входящее письмо"
+    """
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте входящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма')
@@ -73,6 +84,10 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
 
 @dp.callback_query(lambda call: call.data in ['outer_letter','yes_outer'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
+    """
+    Метод обработки исходящих сообщений - выводит сообщения с предложением для отправки письма
+    и устанавливает состояние "отправить исходящее письмо"
+    """
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте исходящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма и Вр-ответа, если есть')
@@ -80,6 +95,10 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
 
 @dp.callback_query(lambda call: call.data in ['request_letter','yes_request'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
+    """
+    Метод обработки запросов - выводит сообщения с предложением для отправки запроса
+    и устанавливает состояние "отправить запрос"
+    """
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте направленный запрос.\nНе забудьте указать RP и суть запроса')
@@ -89,10 +108,14 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
 #region Send_letters
 @dp.message(Form.enter_letter)
 async def process_letter(message: Message, state: Form):
-
-    global COUNTMESS_USER
+    """
+    Метод обработки полученного входящего сообщения.
+    Обрабатывает как ситуацию, где направляется письмо, а затем файлы
+    так и ту, где отправляется только письмо с прикрепленным файлом
+    """
+    global COUNTMESS_USER #Нужен для модернизации с загрузкой файлов. Количество отправленных сообщений пользователем
     if message.caption is not None:
-        await state.update_data(letter=gr.wrap_enterletter(message.caption))
+        await state.update_data(letter=gr.wrap_enterletter(message.caption)) #Вырываем из письма содержание, вр, сроки
         await message.answer("Идет загрузка ⏳")
         COUNTMESS_USER = 0
 
@@ -103,16 +126,16 @@ async def process_letter(message: Message, state: Form):
 
     if COUNTMESS_USER == 0:
         data = await state.get_data()
-        if not data['letter']:
+        if not data['letter']: #Если письмо не сохранилось
             await message.answer("Неправильный формат письма.")
         else:
-            result = gs.post_enterletter(data['letter'])
+            result = gs.post_enterletter(data['letter']) #Если письмо сохранилось, запускаем его в таблицу
             if not result:
                 await message.answer("Это письмо уже есть в таблице.")
             else:
                 await message.answer("Письмо сохранено!")
 
-        await state.clear()
+        await state.clear() #очистка состояния для отправки нового письма
         COUNTMESS_USER=1
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='Да', callback_data="yes_enter"),
@@ -125,7 +148,11 @@ async def process_letter(message: Message, state: Form):
 
 @dp.message(Form.outer_letter)
 async def process_letter(message: Message, state: Form):
-
+    """
+    Метод обработки полученного исходящего сообщения.
+    Обрабатывает как ситуацию, где направляется письмо с вр и вр ответом,
+    так и разделенное на два новых письма
+    """
     if message.caption is not None:
         data = await state.get_data()
         if data:
@@ -141,7 +168,7 @@ async def process_letter(message: Message, state: Form):
 
 
     data = await state.get_data()
-    if data['letter'][1][0]:
+    if data['letter'][1][0]: #При наличии Вр
         await message.answer("Идет загрузка ⏳")
         if not data['letter']:
             await message.answer("Неправильный формат письма.")
@@ -164,6 +191,10 @@ async def process_letter(message: Message, state: Form):
 
 @dp.message(Form.request_letter)
 async def process_letter(message: Message, state: Form):
+    """
+    Метод обработки полученного запроса.
+    Аналогичен методу отправки входящего письма.
+    """
     global COUNTMESS_USER
     if message.caption is not None:
         await state.update_data(letter=gr.wrap_request(message.caption))
@@ -199,6 +230,10 @@ async def process_letter(message: Message, state: Form):
 
 @dp.callback_query(lambda call: call.data == 'no')
 async def process_no(callback_query: CallbackQuery):
+    """
+    Метод обработки отказа от повторной отправки письма.
+    Просто выводит сообщение о вызове меню
+    """
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Нажмите /menu')

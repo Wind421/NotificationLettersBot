@@ -1,5 +1,8 @@
 import re
 
+"""
+Модуль для разбивки писем и запросов на составляющее
+"""
 
 vr_pattern = r'(?i)вр\s*-\s*(\d{8})'
 ansvr_pattern = r'(?i)ответ на вр-\s*(\d{8})'
@@ -7,56 +10,80 @@ request_pattern = r'(?i)RP(\d{5})'
 srok_pattern =  r'(?i)срок\s*(-\s*до\s+|до\s+|:\s+)?(сегодня\s*|(\d{2}\.\d{2}\.(\d{4}|\d{2})))\s*(до)?\s*(\d{1,2}:\d{2})?'
 
 def wrap_enterletter(text):
+    """
+    Метод разбивает текст письма на составляющие:
+    Сам текст - убраны лишние пробелы
+    Временный номер (ВР) - ищет вр, вр-, вр -
+    Срок письма - ищет срок, срок до, срок - до, срок: и даты сегодня, формат 00.00.00 и 00.00.0000 и время 00:00
+    """
     try:
         text = text.strip()
-        vr_match = re.search(vr_pattern, text)
-        srok_match = re.search(srok_pattern, text)
+        vr_match = re.search(vr_pattern, text) #поиск по паттерну
+        srok_match = re.search(srok_pattern, text) #поиск по паттерну
 
         vr_value = vr_match.group(1)
         if vr_value:
-            text = text.replace(vr_match.group(), '')
+            text = text.replace(vr_match.group(), '') #убирает из текста ВР
 
         srok_value = srok_match.group(2) if srok_match else None
 
-        text = re.sub(r'n+', 'n', text)
+        text = re.sub(r'n+', 'n', text) #убирает лишние переносы строк
         text = text.strip()
         return text, vr_value, srok_value
     except Exception:
         return False
 
 def process_text(text):
-    lines = text.splitlines()
+    """
+    Метод убирает все лишнее из текста
+    """
+    lines = text.splitlines() #Разбивает на строки
     result_lines = []
     for line in lines:
-        if "Маршрут" in line:
+        if "Маршрут" in line: #Если найден маршрут, удаляем все после него
             result_lines.append(line[:line.index("Маршрут")])
             break
-        elif "_" in line:
+        elif "_" in line: #Аналогично для нижнего подчеркивания ___
             result_lines.append(line[:line.index("_")])
             break
         else:
             result_lines.append(line)
+
     lines = result_lines
-    lines = [line for line in lines if not line.startswith('#')]
-    lines = [line for line in lines if not any(sub in line for sub in ['Вр-', 'вр-', 'вр -', 'Вр -'])]
-    lines = [line for line in lines if not line.startswith('@')]
+    lines = [line for line in lines if not line.startswith('#')] #Удаляет строку с хэштегами
+    lines = [line for line in lines if not any(sub in line for sub in ['Вр-', 'вр-', 'вр -', 'Вр -'])] #Удаляет строки с вр
+    lines = [line for line in lines if not line.startswith('@')] #Удаляет строки с тэгами
     return '\n'.join(lines)
+
 def wrap_outerletter(text,data=None):
+    """
+    Метод разбивает текст исходящего письма на составляющие:
+    Сам текст - убраны лишние пробелы и все что в рамках process_text
+    Временный номер (ВР) - ищет вр, вр-, вр -
+    Временный номер ответа - ответ на вр-
+    Срок письма - ищет срок, срок до, срок - до, срок: и даты сегодня, формат 00.00.00 и 00.00.0000 и время 00:00
+    """
     text = re.sub(r'n+', 'n', text)
     text = text.strip()
     f_text = process_text(text)
-    if not data:
+    if not data: #первое письмо без данных
         vrs = re.findall(vr_pattern,text)
         ansvr = re.search(ansvr_pattern,text)
         if ansvr:
-            vrs = [v for v in vrs if v != ansvr.group()[-8:]]
-        return f_text, [[vrs[0]] if vrs else False, ansvr.group()[-8:] if ansvr else False]
-    else:
-        if not data[1][0]:
+            vrs = [v for v in vrs if v != ansvr.group()[-8:]] #собирает все вр не совпадающие с ответом на вр
+        return f_text, [[vrs[0]] if vrs else False, ansvr.group()[-8:] if ansvr else False] #возвращает False или вр-ы
+    else: #Второе письмо с данными
+        if not data[1][0]: #Если нет Вр
             data[1][0] = re.findall(vr_pattern, text)
             return data[0]+' '+f_text, data[1]
 
 def wrap_request(text):
+    """
+        Метод разбивает текст исходящего запроса на составляющие:
+        Сам текст - убраны лишние пробелы
+        Номер запроса - ищет RP
+        Срок письма - ищет срок, срок до, срок - до, срок: и даты сегодня, формат 00.00.00 и 00.00.0000 и время 00:00
+        """
     try:
         text = text.strip()
         request_match = re.search(request_pattern, text)
