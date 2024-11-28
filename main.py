@@ -34,6 +34,9 @@ class Form(StatesGroup):
     letter = State()
 
 class FormStatus(StatesGroup):
+    """
+    Класс FormStatus - отслеживает статус какого письма хочет исправить пользователь
+    """
     waiting_for_vr = State()
     waiting_for_status = State()
     vr = ''
@@ -71,11 +74,12 @@ async def menu_def(message: Message):
         [InlineKeyboardButton(text='Изменить статус', callback_data="status")],
         [InlineKeyboardButton(text='отмена', callback_data="no")]
     ])
-
-    await bot.send_message(chat_id=message.chat.id,
+    global BOTMESS_ID
+    last_message = await bot.send_message(chat_id=message.chat.id,
                            text="-----------------Главное меню-----------------",
                            parse_mode=ParseMode.MARKDOWN,
                            reply_markup=markup)
+    BOTMESS_ID = last_message.message_id
 
 @dp.message(Command('work'))
 async def send_menu(message: Message):
@@ -88,6 +92,9 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
     Метод обработки входящих сообщений - выводит сообщения с предложением для отправки письма
     и устанавливает состояние "отправить входящее письмо"
     """
+    global BOTMESS_ID
+    BOTMESS_ID=None
+
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте входящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма')
@@ -99,6 +106,8 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
     Метод обработки исходящих сообщений - выводит сообщения с предложением для отправки письма
     и устанавливает состояние "отправить исходящее письмо"
     """
+    global BOTMESS_ID
+    BOTMESS_ID = None
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте исходящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма и Вр-ответа, если есть')
@@ -110,6 +119,9 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
     Метод обработки запросов - выводит сообщения с предложением для отправки запроса
     и устанавливает состояние "отправить запрос"
     """
+    global BOTMESS_ID
+    BOTMESS_ID = None
+
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Перешлите или отправьте направленный запрос.\nНе забудьте указать RP и суть запроса')
@@ -179,7 +191,7 @@ async def process_letter(message: Message, state: Form):
 
 
     data = await state.get_data()
-    if data['letter'][1][0]!='': #При наличии Вр, либо строка-либо False
+    if data['letter'][1][0]: #При наличии Вр, либо строка-либо False
         await message.answer("Идет загрузка ⏳")
 
         if not data['letter']:
@@ -196,11 +208,12 @@ async def process_letter(message: Message, state: Form):
             [InlineKeyboardButton(text='Да', callback_data="yes_outer"),
                 InlineKeyboardButton(text='Нет', callback_data="no")],
         ])
+        await state.clear()
         await bot.send_message(chat_id=message.chat.id,
                                text="Отправить ещё одно исходящее письмо?",
                                parse_mode=ParseMode.MARKDOWN,
                                reply_markup=markup)
-        await state.clear()
+
 
 @dp.message(Form.request_letter)
 async def process_letter(message: Message, state: Form):
@@ -255,15 +268,26 @@ async def callback_menu(callback_query: CallbackQuery):
         [InlineKeyboardButton(text='Запроса', callback_data="change_request")],
         [InlineKeyboardButton(text='отмена', callback_data="no")]
     ])
-
-    await bot.send_message(callback_query.message.chat.id,
-                           'Какой статус вы хотите обновить?',
-                           reply_markup=markup)
+    global BOTMESS_ID
+    if BOTMESS_ID is not None:
+        await bot.edit_message_text(text='Какой статус вы хотите обновить?',
+                                    chat_id=callback_query.message.chat.id,
+                                    message_id=BOTMESS_ID,
+                                    reply_markup=markup)
+        BOTMESS_ID = None
+    else:
+        await bot.send_message(text='Какой статус вы хотите обновить?',
+                                    chat_id=callback_query.message.chat.id,
+                                    reply_markup=markup)
 
 @dp.callback_query(lambda call: call.data in ['change_enter',"change_outer","change_request"])
 async def callback_change(callback_query: CallbackQuery, state: FormStatus):
     await state.update_data(what=callback_query.data.split('_')[1])
-    await bot.send_message(callback_query.message.chat.id,'Введите вр:')
+
+    if callback_query.data.split('_')[1] in ['enter',"outer"]:
+        await bot.send_message(callback_query.message.chat.id,'Введите Вр:\n(формат вр-00000000)')
+    else:
+        await bot.send_message(callback_query.message.chat.id, 'Введите RP:\n(RP00000)')
     await state.set_state(FormStatus.waiting_for_vr)
 
 @dp.message(FormStatus.waiting_for_vr)
@@ -276,7 +300,7 @@ async def waiting_vr(message: Message, state: FormStatus):
             await state.set_state(FormStatus.waiting_for_status)
         except Exception:
             await state.clear()
-            await bot.send_message(message.chat.id, 'Неправильный формат vr. Попробуйте снова.',
+            await bot.send_message(message.chat.id, 'Неправильный формат vr.\nПопробуйте снова или нажмите /menu',
                              reply_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Изменить статус', callback_data="status")]]))
 
 @dp.message(FormStatus.waiting_for_status)
@@ -285,6 +309,7 @@ async def waiting_status(message: Message, state: FormStatus):
         await state.update_data(status=message.text)
         print(await state.get_data())
         try:
+            await message.answer("Идет загрузка ⏳")
             gs.change(await state.get_data())
             await bot.send_message(message.chat.id, 'Изменение произошло успешно!')
 
@@ -299,10 +324,10 @@ async def waiting_status(message: Message, state: FormStatus):
                                    reply_markup=markup)
         except:
             await state.clear()
-            await bot.send_message(message.chat.id, 'Письма или запроса с таким номером нет. Попробуйте снова.',
-                                   reply_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Изменить статус', callback_data="status")]]))
-
-
+            await bot.send_message(message.chat.id, 'Письма или запроса с таким номером нет.\nПопробуйте снова или нажмите /menu',
+                                   reply_markup = InlineKeyboardMarkup(inline_keyboard=[
+                                       [InlineKeyboardButton(text='Изменить статус', callback_data="status")]
+                                   ]))
 
 #endregion
 
@@ -315,7 +340,6 @@ async def process_no(callback_query: CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
                            'Нажмите /menu')
-
 
 if __name__ == '__main__':
     dp.run_polling(bot)
