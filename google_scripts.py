@@ -6,6 +6,34 @@ from config import CREDENTIALS_FILENAME, PORUCH_SPREADSHEET_URL, MESSAGE_SPREADS
 import pandas as pd
 import re
 
+
+textformat_orange = {
+    "textFormat": {
+      "foregroundColor": {
+        "red": 1,
+        "green": 0.647,
+        "blue": 0
+      }
+    }}
+
+textformat_black = {
+    "textFormat": {
+      "foregroundColor": {
+        "red": 0,
+        "green": 0,
+        "blue": 0
+      }
+    }}
+
+textformat_red = {
+    "textFormat": {
+      "foregroundColor": {
+        "red": 1,
+        "green": 0,
+        "blue": 0
+      }
+    }}
+
 """
 Модуль для загрузки оформленных писем в гугл таблиц и выгрузки из них
 """
@@ -111,7 +139,7 @@ def change(data):
             row_index = rp_column.index(str(data['vr'])) + 1
             worksheet.update_cell(row_index, 12, str(data['status']))
         else:
-            raise ValueError
+            raise KeyError
 
     elif data['what'] == 'outer':
         sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
@@ -119,18 +147,41 @@ def change(data):
         rp_column = worksheet.col_values(2)
         if str(data['vr']) in rp_column:
             row_index = rp_column.index(str(data['vr'])) + 1
-            worksheet.update_cell(row_index, 5, str(data['status']))
+            if 'не согл' in data['status'].lower():
+                worksheet.update_cell(row_index, 5, str(data['status']))
+                worksheet.format(f'E{row_index}', textformat_red)
+            elif 'согл' in data['status'].lower():
+                worksheet.update_cell(row_index, 5, str(data['status']))
+                worksheet.format(f'E{row_index}',textformat_orange)
+            elif 'подпис' in data['status'].lower():
+                worksheet.update_cell(row_index, 5, str('подписано'))
+                worksheet.update_cell(row_index, 6, ' '.join(data['status'].split()[1:]))
+                worksheet.format(f'E{row_index}', textformat_black)
+
+            if worksheet.cell(row_index,7) != '':
+                worksheet2 = sh.worksheet('Вр входящее')
+                rp_column2 = worksheet2.col_values(11)
+                for vr in rp_column2:
+                    if data['vr'] in vr:
+                        row_index2 = rp_column2.index(vr) + 1
+                        if 'согл' in data['status']:
+                            worksheet2.update_cell(row_index2, 12, 'на согласовании')
+                        elif 'подпис' in data['status']:
+                            worksheet2.update_cell(row_index2, 12, 'согласовано')
+            else:
+                raise ValueError
         else:
-            raise ValueError
+            raise KeyError
 
     elif data['what'] == 'request':
         sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
         worksheet = sh.worksheet('СВПО')
         rp_column = worksheet.col_values(2)
         if ('RP'+str(data['vr'])) in rp_column:
-            row_index = rp_column.index('RP'+str(data['vr'])) + 1
-            worksheet.update_cell(row_index, 5, str(data['status']))
-            worksheet.update_cell(row_index, 7, str(datetime.now().strftime("%d.%m.%Y")))
+            if 'выполн' in data['status'].lower():
+                row_index = rp_column.index('RP'+str(data['vr'])) + 1
+                worksheet.update_cell(row_index, 5, str(data['status']))
+                worksheet.update_cell(row_index, 7, str(datetime.now().strftime("%d.%m.%Y")))
         else:
-            raise ValueError
+            raise KeyError
 

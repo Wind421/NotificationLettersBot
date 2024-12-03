@@ -6,6 +6,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from numpy.random.mtrand import set_state
 
 import excel_scripts as es
 import google_requests as gr
@@ -296,12 +297,21 @@ async def waiting_vr(message: Message, state: FormStatus):
         try:
             vr_value = gr.wrap_change(message.text)
             await state.update_data(vr=vr_value)
-            await bot.send_message(message.chat.id,'Введите статус:')
+            data = await state.get_data()
+            print(data['what'])
+            if data['what'] == 'enter':
+                await bot.send_message(message.chat.id,'Введите статус:\n(отработано или согласовано)')
+            elif data['what'] == 'outer':
+                await bot.send_message(message.chat.id,'Введите статус:\n(на согласовании у ... \nили не согласовано у ...\nили подписано 00.00.0000 №Исх-...)')
+            elif data['what'] == 'request':
+                await bot.send_message(message.chat.id,'Введите статус:\n(выполнено или не выполнено)')
             await state.set_state(FormStatus.waiting_for_status)
-        except Exception:
+
+        except KeyError:
             await state.clear()
             await bot.send_message(message.chat.id, 'Неправильный формат vr.\nПопробуйте снова или нажмите /menu',
-                             reply_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Изменить статус', callback_data="status")]]))
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [InlineKeyboardButton(text='Изменить статус', callback_data="status")]]))
 
 @dp.message(FormStatus.waiting_for_status)
 async def waiting_status(message: Message, state: FormStatus):
@@ -322,7 +332,12 @@ async def waiting_status(message: Message, state: FormStatus):
                                    text="Изменить что-то ещё?",
                                    parse_mode=ParseMode.MARKDOWN,
                                    reply_markup=markup)
-        except:
+        except ValueError:
+            await state.clear()
+            await bot.send_message(message.chat.id, 'Неправильный формат статуса.\nПопробуйте снова или нажмите /menu',
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [InlineKeyboardButton(text='Изменить статус', callback_data="status")]]))
+        except KeyError:
             await state.clear()
             await bot.send_message(message.chat.id, 'Письма или запроса с таким номером нет.\nПопробуйте снова или нажмите /menu',
                                    reply_markup = InlineKeyboardMarkup(inline_keyboard=[
