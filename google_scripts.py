@@ -15,7 +15,6 @@ textformat_orange = {
         "blue": 0
       }
     }}
-
 textformat_black = {
     "textFormat": {
       "foregroundColor": {
@@ -24,7 +23,6 @@ textformat_black = {
         "blue": 0
       }
     }}
-
 textformat_red = {
     "textFormat": {
       "foregroundColor": {
@@ -49,10 +47,10 @@ def load_tasks():
     data = pd.DataFrame(data[3:],columns = data[2])
 
     def clean_string(s): #Очистка для корректности создания экселя
-        return re.sub(r'[^a-zA-Zа-яА-Я0-9 (),.?!–;:]', '', s)
+        return re.sub(r'[^a-zA-Zа-яА-Я0-9 \-(),.?!;:]', '', s)
 
     df_cleaned = data.map(clean_string)
-    filename = rf'C:\Users\Дарья\PycharmProjects\excel\Кампус-поручения_{datetime.today().strftime("%Y-%m-%d")}.xlsx'
+    filename = rf'.\excel\Кампус-поручения_{datetime.today().strftime("%Y-%m-%d")}.xlsx'
     df_cleaned.to_excel(filename,index=False)
 
 def post_enterletter(letter):
@@ -89,6 +87,9 @@ def post_outerletter(letter):
             row_data = ('', str(*vr), str(letter[2]), str(letter[0]), 'на согласовании', '', '')
         worksheet.append_row(row_data)
         worksheet.format("D", {"wrapStrategy": "WRAP"})
+
+        row_index = len(vr_column) + 1 #Красим строчку на согласовании в оранжевый
+        worksheet.format(f'E{row_index}', textformat_orange)
         return True
     else:
         return False
@@ -184,4 +185,3 @@ def change(data):
                 worksheet.update_cell(row_index, 7, str(datetime.now().strftime("%d.%m.%Y")))
         else:
             raise KeyError
-

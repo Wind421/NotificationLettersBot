@@ -3,6 +3,7 @@ import asyncio
 import pandas as pd
 import schedule
 from aiogram import Bot
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramForbiddenError
 
 import form_notification as fn
@@ -18,22 +19,25 @@ async def send_message():
     """
     Метод отправки уведомления - выгружает нужный файл, читает и отправляет ботом
     """
-    with open(r'C:\Users\Дарья\PycharmProjects\TgBotNotifications\message.txt', 'r', encoding='ANSI') as file:
-        file_content = file.read()
+    with open(r'.\message.txt', 'r', encoding='ANSI') as file:
+        file_content = file.readlines()
 
-    df = pd.read_excel(r'C:\Users\Дарья\PycharmProjects\TgBotNotifications\users.xlsx')
+    df = pd.read_excel(r'.\users.xlsx')
 
     for value in df.iloc[:, 0]: #Перебор списка с пользователями для отправки сообщения
         try:
-            await bot.send_message(value,file_content) #Надо добавить parse_mode = ParseMode.MARKDOWN
+            await bot.send_message(value,''.join(file_content[1:]),parse_mode = ParseMode.MARKDOWN)
         except TelegramForbiddenError:
             pass
+
+    if file_content[0] == 'Требуется обновление\n':
+        await bot.send_message(1617319542, f'Обновите контрольные точки!\nНажмите: /send_kt')
 
 def schedule_message():
     """
     Метод для установки расписания - должно быть 10-00
     """
-    schedule.every().day.at("16:20").do(lambda: asyncio.create_task(send_message()))
+    schedule.every().day.at("11:57").do(lambda: asyncio.create_task(send_message()))
 
 async def main():
     """
@@ -48,3 +52,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

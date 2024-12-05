@@ -1,17 +1,14 @@
 import logging
-from binascii import Error
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from numpy.random.mtrand import set_state
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery,ContentType
 
 import excel_scripts as es
 import google_requests as gr
 import google_scripts as gs
-from google_scripts import change
 
 logging.basicConfig(level=logging.INFO)
 
@@ -43,6 +40,9 @@ class FormStatus(StatesGroup):
     vr = ''
     status = ''
     what = ''
+
+class FormKT(StatesGroup):
+    waiting_for_kt = State()
 
 @dp.message(Command("start"))
 async def start_def(message: Message):
@@ -86,6 +86,24 @@ async def menu_def(message: Message):
 async def send_menu(message: Message):
     await bot.send_message(message.chat.id, 'Привет, Я работаю')
 
+@dp.message(Command('send_kt'))
+async def send_menu(message: Message, state: FormKT):
+    await bot.send_message(message.chat.id,
+                           'Перешлите или отправьте экспорт контрольных точек из ГАСУ. \nНЕ ИЗМЕНЯЙТЕ ФАЙЛ ИЛИ ЕГО НАЗВАНИЕ.')
+    await state.set_state(FormKT.waiting_for_kt)
+
+@dp.message(FormKT.waiting_for_kt)
+async def process_letter(message: Message, state: FormKT):
+    if message.content_type == ContentType.DOCUMENT:
+        try:
+            file = await bot.get_file(message.document.file_id)
+            file_path = '.\excel\\'+str(message.document.file_name)
+            await bot.download_file(file.file_path, file_path)
+            await bot.send_message(message.chat.id, 'Файл успешно сохранен!')
+            await bot.send_message(message.chat.id, 'Нажмите /menu')
+        except Exception:
+            await bot.send_message(message.chat.id, 'Что-то пошло не так.')
+            print(Exception.args)
 #region Menu functions
 @dp.callback_query(lambda call: call.data in ['enter_letter','yes_enter'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
