@@ -12,7 +12,7 @@ import google_scripts as gs
 
 logging.basicConfig(level=logging.INFO)
 
-from config import *
+from config import TOKEN
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -104,6 +104,7 @@ async def process_letter(message: Message, state: FormKT):
         except Exception:
             await bot.send_message(message.chat.id, 'Что-то пошло не так.')
             print(Exception.args)
+
 #region Menu functions
 @dp.callback_query(lambda call: call.data in ['enter_letter','yes_enter'])
 async def callback_menu(callback_query: CallbackQuery, state: Form):
@@ -116,7 +117,7 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
 
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
-                           'Перешлите или отправьте входящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма')
+                           'Перешлите или отправьте входящее письмо.\nОБЯЗАТЕЛЬНО (формат вр-0000000): ВР\nНе забудьте указать суть письма и срок\n(формат срок 00.00.0000 или срок срочно или срок сегодня)')
     await state.set_state(Form.enter_letter)
 
 @dp.callback_query(lambda call: call.data in ['outer_letter','yes_outer'])
@@ -129,7 +130,7 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
     BOTMESS_ID = None
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
-                           'Перешлите или отправьте исходящее письмо.\nОБЯЗАТЕЛЬНО: ВР\nНе забудьте указать суть письма и Вр-ответа, если есть')
+                           'Перешлите или отправьте исходящее письмо.\nОБЯЗАТЕЛЬНО (формат вр-0000000): ВР\nНе забудьте указать суть письма и Вр-ответа\n(формат Ответ на вр-00000000)')
     await state.set_state(Form.outer_letter)
 
 @dp.callback_query(lambda call: call.data in ['request_letter','yes_request'])

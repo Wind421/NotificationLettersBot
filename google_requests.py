@@ -1,5 +1,6 @@
 import re
 import copy
+from datetime import datetime, timedelta
 
 """
 Модуль для разбивки писем и запросов на составляющее
@@ -27,12 +28,10 @@ def wrap_enterletter(text):
     Временный номер (ВР) - ищет вр, вр-, вр -
     Срок письма - ищет срок, срок до, срок - до, срок: и даты сегодня, формат 00.00.00 и 00.00.0000 и время 00:00
     """
-
-    ### ДОБАВИТЬ КОРРЕКТИРОВКУ ЧТОБЫ УБИРАЛОСЬ ИСХ СЛУЖЕБНОЕ ПИСЬМО ( ЕСЛИ ОНО С ЭТОГО НАЧИНАЕТСЯ
     try:
         text = text.strip()
         vr_match = re.search(vr_pattern, text) #поиск по паттерну
-        srok_match = re.search(srok_pattern, text) #поиск по паттерну
+        srok_match = re.search(srok_pattern, text.lower()) #поиск по паттерну
 
         vr_value = vr_match.group(1)
         if vr_value:
@@ -51,6 +50,13 @@ def wrap_enterletter(text):
 
         text = re.sub(r'n+', 'n', text) #убирает лишние переносы строк
         text = text.strip()
+        if srok_value:
+            if 'сегодня' in srok_value.lower():
+                srok_value = str(datetime.today().strftime('%d.%m.%Y'))
+            elif 'срочно' in srok_value.lower():
+                srok_value = str((datetime.today() + timedelta(days=3)).strftime('%d.%m.%Y'))
+        else:
+            srok_value = 'срок не указан'
         return text, vr_value, srok_value, project
     except Exception:
         return False

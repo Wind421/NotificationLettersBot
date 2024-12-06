@@ -3,8 +3,6 @@ from datetime import datetime
 import pandas as pd
 import os
 
-import main
-
 """
 Модуль для работы с экселем - 
     фильтрафия таблиц, 

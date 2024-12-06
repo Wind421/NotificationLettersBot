@@ -37,7 +37,7 @@ def schedule_message():
     """
     Метод для установки расписания - должно быть 10-00
     """
-    schedule.every().day.at("11:57").do(lambda: asyncio.create_task(send_message()))
+    schedule.every().day.at("10:00").do(lambda: asyncio.create_task(send_message()))
 
 async def main():
     """

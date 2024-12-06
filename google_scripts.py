@@ -2,7 +2,7 @@ from datetime import datetime
 
 import gspread
 from gspread_formatting import get_effective_format,format_cell_ranges,CellFormat
-from config import CREDENTIALS_FILENAME, PORUCH_SPREADSHEET_URL, MESSAGE_SPREADSHEET_URL
+from config import CREDENTIALS_FILENAME, PORUCH_SPREADSHEET_URL, MESSAGE_SPREADSHEET_URL,TRUE_MESSAGE_SPREADSHEET_URL,TRUE_CVPO_SPREADSHEET_URL
 import pandas as pd
 import re
 
@@ -57,8 +57,8 @@ def post_enterletter(letter):
     """
     Метод загрузки входящих писем в гугл-таблицу
     """
-    sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
-    worksheet = sh.worksheet('Вр входящее')
+    sh = gc.open_by_url(TRUE_MESSAGE_SPREADSHEET_URL)
+    worksheet = sh.worksheet('ВР входящие')
 
     vr = letter[1]
     vr_column = worksheet.col_values(2)
@@ -74,8 +74,8 @@ def post_outerletter(letter):
     """
     Метод загрузки исходящих писем в гугл-таблицу
     """
-    sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
-    worksheet = sh.worksheet('Вр исходящее')
+    sh = gc.open_by_url(TRUE_MESSAGE_SPREADSHEET_URL)
+    worksheet = sh.worksheet('ВР исходящие')
 
     vr = letter[1][0]
     vr_column = worksheet.col_values(2)
@@ -98,7 +98,7 @@ def post_request(letter):
     """
     Метод загрузки запросов в гугл-таблицу
     """
-    sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
+    sh = gc.open_by_url(TRUE_CVPO_SPREADSHEET_URL)
     worksheet = sh.worksheet('СВПО')
 
     rp = letter[1]
@@ -116,8 +116,8 @@ def post_request(letter):
 
 def post_ansvr(letter):
     if letter[1][1] != '':
-        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
-        worksheet = sh.worksheet('Вр входящее')
+        sh = gc.open_by_url(TRUE_MESSAGE_SPREADSHEET_URL)
+        worksheet = sh.worksheet('ВР входящие')
         rp_column = worksheet.col_values(2)
         for vr in letter[1][1]:
             if str(vr) in rp_column:
@@ -133,8 +133,8 @@ def post_ansvr(letter):
 
 def change(data):
     if data['what'] == 'enter':
-        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
-        worksheet = sh.worksheet('Вр входящее')
+        sh = gc.open_by_url(TRUE_MESSAGE_SPREADSHEET_URL)
+        worksheet = sh.worksheet('ВР входящие')
         rp_column = worksheet.col_values(2)
         if str(data['vr']) in rp_column:
             row_index = rp_column.index(str(data['vr'])) + 1
@@ -143,8 +143,8 @@ def change(data):
             raise KeyError
 
     elif data['what'] == 'outer':
-        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
-        worksheet = sh.worksheet('Вр исходящее')
+        sh = gc.open_by_url(TRUE_MESSAGE_SPREADSHEET_URL)
+        worksheet = sh.worksheet('ВР исходящие')
         rp_column = worksheet.col_values(2)
         if str(data['vr']) in rp_column:
             row_index = rp_column.index(str(data['vr'])) + 1
@@ -160,7 +160,7 @@ def change(data):
                 worksheet.format(f'E{row_index}', textformat_black)
 
             if worksheet.cell(row_index,7) != '':
-                worksheet2 = sh.worksheet('Вр входящее')
+                worksheet2 = sh.worksheet('ВР входящие')
                 rp_column2 = worksheet2.col_values(11)
                 for vr in rp_column2:
                     if data['vr'] in vr:
@@ -175,7 +175,7 @@ def change(data):
             raise KeyError
 
     elif data['what'] == 'request':
-        sh = gc.open_by_url(MESSAGE_SPREADSHEET_URL)
+        sh = gc.open_by_url(TRUE_CVPO_SPREADSHEET_URL)
         worksheet = sh.worksheet('СВПО')
         rp_column = worksheet.col_values(2)
         if ('RP'+str(data['vr'])) in rp_column:
