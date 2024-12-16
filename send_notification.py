@@ -1,3 +1,4 @@
+import os
 import asyncio
 
 import pandas as pd
@@ -19,10 +20,10 @@ async def send_message():
     """
     Метод отправки уведомления - выгружает нужный файл, читает и отправляет ботом
     """
-    with open(r'.\message.txt', 'r', encoding='ANSI') as file:
+    with open(os.path.join('.', 'message.txt'), 'r', encoding='ANSI') as file:
         file_content = file.readlines()
 
-    df = pd.read_excel(r'.\users.xlsx')
+    df = pd.read_excel(os.path.join('.', 'users.xlsx'))
 
     for value in df.iloc[:, 0]: #Перебор списка с пользователями для отправки сообщения
         try:

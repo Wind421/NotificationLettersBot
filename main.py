@@ -1,3 +1,4 @@
+import os
 import logging
 
 from aiogram import Bot, Dispatcher
@@ -97,7 +98,7 @@ async def process_letter(message: Message, state: FormKT):
     if message.content_type == ContentType.DOCUMENT:
         try:
             file = await bot.get_file(message.document.file_id)
-            file_path = '.\excel\\'+str(message.document.file_name)
+            file_path = os.path.join('.', 'excel', str(message.document.file_name))
             await bot.download_file(file.file_path, file_path)
             await bot.send_message(message.chat.id, 'Файл успешно сохранен!')
             await bot.send_message(message.chat.id, 'Нажмите /menu')

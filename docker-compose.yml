@@ -1,0 +1,17 @@
+version: '3.7'
+
+services:
+  main:
+    restart: unless-stopped
+    build:
+      context: .
+    command:
+      - python
+      - main.py
+  send_notifications:
+    restart: unless-stopped
+    build:
+      context: .
+    command:
+      - python
+      - send_notification.py
