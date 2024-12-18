@@ -5,7 +5,7 @@ from gspread_formatting import get_effective_format,format_cell_ranges,CellForma
 from config import CREDENTIALS_FILENAME, PORUCH_SPREADSHEET_URL, MESSAGE_SPREADSHEET_URL,TRUE_MESSAGE_SPREADSHEET_URL,TRUE_CVPO_SPREADSHEET_URL
 import pandas as pd
 import re
-
+import os
 
 textformat_orange = {
     "textFormat": {
@@ -50,7 +50,7 @@ def load_tasks():
         return re.sub(r'[^a-zA-Zа-яА-Я0-9 \-(),.?!;:]', '', s)
 
     df_cleaned = data.map(clean_string)
-    filename = rf'.\excel\Кампус-поручения_{datetime.today().strftime("%Y-%m-%d")}.xlsx'
+    filename = os.path.join('.','excel',f'Кампус-поручения_{datetime.today().strftime("%Y-%m-%d")}.xlsx')
     df_cleaned.to_excel(filename,index=False)
 
 def post_enterletter(letter):

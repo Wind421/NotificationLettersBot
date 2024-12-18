@@ -1,5 +1,5 @@
 import asyncio
-
+import os
 import pandas as pd
 import schedule
 from aiogram import Bot
@@ -19,19 +19,19 @@ async def send_message():
     """
     Метод отправки уведомления - выгружает нужный файл, читает и отправляет ботом
     """
-    with open(r'.\message.txt', 'r', encoding='ANSI') as file:
+    fn.write_current_date()
+    with open(os.path.join('.','message.txt'), 'r', encoding='utf-8') as file:
         file_content = file.readlines()
 
-    df = pd.read_excel(r'.\users.xlsx')
+    df = pd.read_excel(os.path.join('.','users.xlsx'))
 
     for value in df.iloc[:, 0]: #Перебор списка с пользователями для отправки сообщения
         try:
             await bot.send_message(value,''.join(file_content[1:]),parse_mode = ParseMode.MARKDOWN)
+            if file_content[0] == 'Требуется обновление\n':
+                await bot.send_message(value, f'Обновите контрольные точки!\nНажмите: /send_kt')
         except TelegramForbiddenError:
             pass
-
-    if file_content[0] == 'Требуется обновление\n':
-        await bot.send_message(1617319542, f'Обновите контрольные точки!\nНажмите: /send_kt')
 
 def schedule_message():
     """
@@ -44,7 +44,6 @@ async def main():
     Основной метод - формирует уведомление,
     а затем проверяет не пришло ли время его отправлять.
     """
-    fn.write_current_date()
     schedule_message()
     while True:
         schedule.run_pending()

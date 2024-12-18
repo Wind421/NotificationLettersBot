@@ -15,7 +15,7 @@ def read_dk_tasks(what):
     по заданному пути находит самый последний модифицированный файл и экспортирует путь до него
     """
     export_files = []
-    directory = r'.\excel'
+    directory = os.path.join('.','excel')
     for root, dirs, files in os.walk(directory):
         for file in files:
             if what in file:
@@ -26,7 +26,7 @@ def read_dk_tasks(what):
     export_files.sort(key=lambda x: x[1],reverse = True) #сортировка и экспорт пути файла
 
     if (datetime.today()-export_files[0][1]).days > 7 and what == 'Экспорт':
-        with open(r'.\message.txt', 'w', encoding='ANSI') as file:
+        with open(os.path.join('.','message.txt'), 'w', encoding='utf-8') as file:
             file.write('Требуется обновление\n')
     print(export_files[0][0])
     return export_files[0][0]
@@ -57,7 +57,7 @@ def post_user(user_id, first_name):
     Добавляет новых пользователей в таблицу user при запуске бота,
     учитывает если бот запускался \start несколько раз. В таблицу добавляет id и имя
     """
-    filename = r'.\users.xlsx'
+    filename = os.path.join('.','users.xlsx')
     try:
         df = pd.read_excel(filename)
     except FileNotFoundError:

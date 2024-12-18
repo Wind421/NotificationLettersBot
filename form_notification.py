@@ -2,6 +2,7 @@ from datetime import datetime
 import excel_scripts as es
 import google_scripts as gs
 import pandas as pd
+import os
 pd.set_option('display.max_columns', None)
 
 """
@@ -64,5 +65,5 @@ def write_current_date():
     """
     Метод открывает и записывать в файл сформированный notification
     """
-    with open('message.txt', 'a') as file:
+    with open(os.path.join('message.txt'), 'a',encoding='utf-8') as file:
         file.write(notification())
