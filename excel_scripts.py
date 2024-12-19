@@ -26,10 +26,17 @@ def read_dk_tasks(what):
     export_files.sort(key=lambda x: x[1],reverse = True) #сортировка и экспорт пути файла
 
     if (datetime.today()-export_files[0][1]).days > 7 and what == 'Экспорт':
-        with open(os.path.join('.','message.txt'), 'w', encoding='utf-8') as file:
+        with open(os.path.join('.','message.txt'), 'a', encoding='utf-8') as file:
             file.write('Требуется обновление\n')
-    print(export_files[0][0])
-    return export_files[0][0]
+
+    latest_file_path = export_files[0][0]
+
+    # Удаляем все файлы, которые удовлетворяют критериям, кроме самого нового
+    for file_path, _ in export_files:
+        if file_path != latest_file_path and what in file_path:
+            os.remove(file_path)  # Удаляем файл
+
+    return latest_file_path
 
 def filter_dk(df):
     """
@@ -37,7 +44,7 @@ def filter_dk(df):
     """
     mask_status = ('Завершена' not in df['Статус'])
     today = datetime.today()
-    mask_deadline = df['Крайний срок'].apply(lambda x: (pd.to_datetime(x,dayfirst=True) - today).days in [1, 3, 7, 10, 14, 30, 0])
+    mask_deadline = df['Крайний срок'].apply(lambda x: (pd.to_datetime(x,dayfirst=True) - today).days in [1, 3, 7, 14, 0])
     filtered_df = df[mask_status & mask_deadline]
     return filtered_df
 
@@ -48,7 +55,7 @@ def filter_tasks(df):
     mask_status = ('Выполнено' not in df['Статус'])
     mask_status2 = ('Неактуально' not in df['Статус'])
     mask_importance = (df['Приоритет (1 - высокий, 2 - средний, 3 - низкий)'] == 1)
-    mask_deadline = df['Просроченность'].apply(lambda x: x in ['-1', '-3', '-7', '-10', '-14', '-30', '0'])
+    mask_deadline = df['Просроченность'].apply(lambda x: x in ['-1', '-3', '-7', '-14', '0'])
     filtered_df = df[mask_status & mask_status2 & mask_importance & mask_deadline]
     return filtered_df
 
