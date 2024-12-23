@@ -27,9 +27,11 @@ async def send_message():
 
     for value in df.iloc[:, 0]: #Перебор списка с пользователями для отправки сообщения
         try:
-            await bot.send_message(value,''.join(file_content[1:]),parse_mode = ParseMode.MARKDOWN)
             if file_content[0] == 'Требуется обновление\n':
+                await bot.send_message(value, ''.join(file_content[1:]), parse_mode=ParseMode.MARKDOWN)
                 await bot.send_message(value, f'Обновите контрольные точки!\nНажмите: /send_kt')
+            else:
+                await bot.send_message(value, ''.join(file_content), parse_mode=ParseMode.MARKDOWN)
         except TelegramForbiddenError:
             pass
 
