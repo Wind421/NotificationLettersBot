@@ -3,8 +3,8 @@ import os
 import pandas as pd
 import schedule
 from aiogram import Bot
-from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramForbiddenError
+from aiogram.exceptions import TelegramForbiddenError,TelegramBadRequest
+from aiogram.types.input_file import FSInputFile
 
 import form_notification as fn
 from config import TOKEN
@@ -28,12 +28,14 @@ async def send_message():
     for value in df.iloc[:, 0]: #Перебор списка с пользователями для отправки сообщения
         try:
             if file_content[0] == 'Требуется обновление\n':
-                await bot.send_message(value, ''.join(file_content[1:]), parse_mode=ParseMode.MARKDOWN)
+                await bot.send_message(value, ''.join(file_content[1:]))
                 await bot.send_message(value, f'Обновите контрольные точки!\nНажмите: /send_kt')
             else:
-                await bot.send_message(value, ''.join(file_content), parse_mode=ParseMode.MARKDOWN)
+                await bot.send_message(value, ''.join(file_content))
         except TelegramForbiddenError:
             pass
+        except TelegramBadRequest:
+            await bot.send_document(value, FSInputFile(os.path.join('.', 'message.txt.')), caption="Количество точек и поручений слишком много.\nДля ознакомления c ними откройте файл.")
 
 def schedule_message():
     """
