@@ -65,7 +65,7 @@ def post_enterletter(letter):
     if not any(vr == item or (item.lower().startswith("вр-") and item[3:] == vr) for item in vr_column): #Если найден не такой же вр как и у письма
         row_data = ('',letter[1], str(datetime.now().strftime("%d.%m.%Y")), letter[3], letter[0], '', 'срок не указан', letter[2])
         worksheet.append_row(row_data)
-        worksheet.format("D", {"wrapStrategy": "WRAP"}) #перенос
+        worksheet.format("E", {"wrapStrategy": "WRAP"}) #перенос
         return True
     else:
         return False

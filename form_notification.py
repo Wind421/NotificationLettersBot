@@ -65,5 +65,5 @@ def write_current_date():
     """
     Метод открывает и записывать в файл сформированный notification
     """
-    with open(os.path.join('message.txt'), 'w+',encoding='utf-8') as file:
+    with open('message.txt', 'w+',encoding='utf-8') as file:
         file.write(notification())

@@ -26,7 +26,7 @@ def read_dk_tasks(what):
     export_files.sort(key=lambda x: x[1],reverse = True) #сортировка и экспорт пути файла
 
     if (datetime.today()-export_files[0][1]).days > 7 and what == 'Экспорт':
-        with open(os.path.join('.','message.txt'), 'a', encoding='utf-8') as file:
+        with open('message.txt', 'a', encoding='utf-8') as file:
             file.write('Требуется обновление\n')
 
     latest_file_path = export_files[0][0]

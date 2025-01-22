@@ -89,7 +89,7 @@ async def send_menu(message: Message):
 @dp.message(Command('send_kt'))
 async def send_menu(message: Message, state: FormKT):
     await bot.send_message(message.chat.id,
-                           'Перешлите или отправьте экспорт контрольных точек из ГАСУ. \nНЕ ИЗМЕНЯЙТЕ ФАЙЛ ИЛИ ЕГО НАЗВАНИЕ.')
+                           'Прикрепите экспорт контрольных точек из ГАСУ. \nПримечание: не изменяйте файл, прикрепите исходную выгрузку.')
     await state.set_state(FormKT.waiting_for_kt)
 
 @dp.message(FormKT.waiting_for_kt)
@@ -117,7 +117,7 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
 
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
-                           'Перешлите или отправьте входящее письмо.\nОБЯЗАТЕЛЬНО (формат вр-0000000): ВР\nНе забудьте указать суть письма и срок\n(формат срок 00.00.0000 или срок срочно или срок сегодня)')
+                           'Прикрепите входящее письмо.\nПримечание: обязательно укажите вр-0000000\nНе забудьте указать суть письма и срок\n(00.00.0000 или срок срочно или срок сегодня)')
     await state.set_state(Form.enter_letter)
 
 @dp.callback_query(lambda call: call.data in ['outer_letter','yes_outer'])
@@ -130,7 +130,7 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
     BOTMESS_ID = None
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
-                           'Перешлите или отправьте исходящее письмо.\nОБЯЗАТЕЛЬНО (формат вр-0000000): ВР\nНе забудьте указать суть письма и Вр-ответа\n(формат Ответ на вр-00000000)')
+                           'Прикрепите исходящее письмо.\nПримечание: обязательно укажите вр-0000000\nНе забудьте указать суть письма и Вр-ответа (ответ на вр-00000000)')
     await state.set_state(Form.outer_letter)
 
 @dp.callback_query(lambda call: call.data in ['request_letter','yes_request'])
@@ -144,7 +144,7 @@ async def callback_menu(callback_query: CallbackQuery, state: Form):
 
     await bot.answer_callback_query(callback_query.id)
     await bot.send_message(callback_query.message.chat.id,
-                           'Перешлите или отправьте направленный запрос.\nНе забудьте указать RP и суть запроса')
+                           'Прикрепите направленный запрос.\nПримечание: не забудьте указать RP и суть запроса')
     await state.set_state(Form.request_letter)
 #endregion Menu functions
 
@@ -319,9 +319,9 @@ async def waiting_vr(message: Message, state: FormStatus):
             data = await state.get_data()
             print(data['what'])
             if data['what'] == 'enter':
-                await bot.send_message(message.chat.id,'Введите статус:\n(отработано или согласовано)')
+                await bot.send_message(message.chat.id,'Введите статус:\n- отработано\n- согласовано)')
             elif data['what'] == 'outer':
-                await bot.send_message(message.chat.id,'Введите статус:\n(на согласовании у ... \nили не согласовано у ...\nили подписано 00.00.0000 №Исх-...)')
+                await bot.send_message(message.chat.id,'Введите статус:\n- на согласовании у ... \n- не согласовано у ...\n- подписано 00.00.0000 №Исх-...)')
             elif data['what'] == 'request':
                 await bot.send_message(message.chat.id,'Введите статус:\n(выполнено или не выполнено)')
             await state.set_state(FormStatus.waiting_for_status)
